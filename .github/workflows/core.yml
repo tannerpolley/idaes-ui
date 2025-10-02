@@ -57,12 +57,13 @@ jobs:
         #   - '3.10'
         #   - '3.11'
           - '3.12'
+          - '3.13'
         os:
           - linux
           - win64
         include:
           - os: linux
-            runner-image: ubuntu-20.04
+            runner-image: ubuntu-latest
           - os: win64
             runner-image: windows-2022
     steps:  
@@ -96,12 +97,13 @@ jobs:
         #   - '3.10'
         #   - '3.11'
           - '3.12'
+          - '3.13'
         os:
           - linux
           - win64
         include:
           - os: linux
-            runner-image: ubuntu-20.04
+            runner-image: ubuntu-latest
           - os: win64
             runner-image: windows-2022
     steps:
@@ -114,7 +116,7 @@ jobs:
       #cypress starts here
       - name: Check out files needed to run cypress tests
         if: matrix.install-variant != 'dev'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           sparse-checkout-cone-mode: false
           sparse-checkout: |
