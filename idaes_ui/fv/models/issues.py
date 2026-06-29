@@ -18,8 +18,10 @@ from idaes.core.util import model_statistics as ims
 from idaes.core.util import model_diagnostics as imd
 
 # Import other needed IDAES types
+from pyomo.common.collections import ComponentSet
 from pyomo.core.base.block import _BlockData
-from pyomo.environ import value
+from pyomo.core.expr.visitor import identify_variables
+from pyomo.environ import Constraint, Var, value
 from pyomo.util.check_units import identify_inconsistent_units
 
 from .base import DiagnosticsException
@@ -142,8 +144,8 @@ class ModelIssues(BaseModel):
         c = self._config
         objs = [
             ModelIssueVariable(name=v.name, value=v.value, fixed=v.fixed)
-            for v in imd._vars_with_extreme_values(
-                model=self._block,
+            for v in _vars_with_extreme_values(
+                block=self._block,
                 large=c.variable_large_value_tolerance,
                 small=c.variable_small_value_tolerance,
                 zero=c.variable_zero_value_tolerance,
@@ -260,7 +262,7 @@ class ModelIssues(BaseModel):
             self.issues.append(issue)
 
     def _add_not_in_act_constr(self):
-        unused = imd.variables_not_in_activated_constraints_set(self._block)
+        unused = _variables_not_in_activated_constraints_set(self._block)
         if not unused:
             return
         issue = ModelIssue(
@@ -273,3 +275,28 @@ class ModelIssues(BaseModel):
             obj = ModelIssueVariable(name=v.name, value=v.value, fixed=v.fixed)
             issue.objects.append(obj)
         self.issues.append(issue)
+
+
+def _vars_with_extreme_values(block: _BlockData, large: float, small: float, zero: float):
+    for variable in block.component_data_objects(Var, descend_into=True):
+        variable_value = value(variable, exception=False)
+        if variable_value is None:
+            continue
+        abs_value = abs(variable_value)
+        if abs_value >= large or zero < abs_value <= small:
+            yield variable
+
+
+def _variables_not_in_activated_constraints_set(block: _BlockData):
+    active_constraint_variables = ComponentSet()
+    for constraint in block.component_data_objects(
+        Constraint, active=True, descend_into=True
+    ):
+        for variable in identify_variables(constraint.body, include_fixed=True):
+            active_constraint_variables.add(variable)
+
+    return ComponentSet(
+        variable
+        for variable in block.component_data_objects(Var, descend_into=True)
+        if variable not in active_constraint_variables
+    )

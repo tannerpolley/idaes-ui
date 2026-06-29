@@ -16,7 +16,21 @@ import { JointJsCellConfig } from './cell_config';
 import { StreamTable } from './stream_table';
 import { Toolbar } from './toolbar';
 import { messageBarTemplateGenerator } from '@/components/MessageBar/MessageBarTemplateGenerator';
+import TracePlayer from '@/trace/TracePlayer';
+import { fetchRunTrace } from '@/trace/traceApi';
+import {
+  createInitialTracePlayerState,
+  getActiveTraceEvent,
+  nextTraceStep,
+  previousTraceStep,
+  resetTracePlayer,
+  setTraceSpeed,
+  toggleTracePlayback,
+} from '@/trace/tracePlayerState';
+import type { RunTrace, TracePlayerState } from '@/trace/types';
 import axios from 'axios';
+import { createRoot } from 'react-dom/client';
+import type { Root } from 'react-dom/client';
 const VITE_MODE = import.meta.env.VITE_MODE;
 
 const isDevTest:Boolean = false;
@@ -46,6 +60,11 @@ export class FV {
   toolbar: any;
   cleanToolBarEvent: any;
   viewInLogPanel:any;
+  trace:RunTrace | null;
+  tracePlayerState:TracePlayerState | null;
+  tracePlayerRoot:Root | null;
+  tracePlaybackTimer:number | null;
+  activeTraceStreamIds:string[];
 
 
   constructor (
@@ -71,6 +90,11 @@ export class FV {
 
     //Define model
     this.model = {}
+    this.trace = null;
+    this.tracePlayerState = null;
+    this.tracePlayerRoot = null;
+    this.tracePlaybackTimer = null;
+    this.activeTraceStreamIds = [];
 
     //Generate jointjs visualizer paper which displays joint js
     //if statment control when fv not show the paper should not render
@@ -107,7 +131,11 @@ export class FV {
         // new this.toolbar
         this.toolbar = new Toolbar(this, this.paper, this.stream_table, this.flowsheetId, this.getFSUrl,this.putFSUrl, this.isFvShow);
         // get toolbar event cleanup function
-        this.cleanToolBarEvent = this.toolbar.cleanUpEvent;
+        this.cleanToolBarEvent = () => {
+          this.toolbar.cleanUpEvent();
+          this.cleanTracePlayer();
+        };
+        if(isFvShow) this.setupTracePlayer();
     })
     .catch((error) => {
         console.log(error.message);
@@ -252,6 +280,187 @@ export class FV {
     });
   }
 
+  setupTracePlayer() {
+    const traceBaseUrl = VITE_MODE === "dev" ? this.baseUrl : "";
+
+    fetchRunTrace(traceBaseUrl, this.flowsheetId)
+      .then((trace) => {
+        if(!trace) return;
+
+        this.trace = trace;
+        this.tracePlayerState = createInitialTracePlayerState(trace);
+        this.applyTraceStep();
+        this.renderTracePlayer();
+      })
+      .catch((error) => {
+        console.log(error.message);
+      });
+  }
+
+  renderTracePlayer() {
+    if(!this.trace || !this.tracePlayerState) return;
+
+    const tracePlayerContainer = this.getTracePlayerContainer();
+    if(!tracePlayerContainer) return;
+
+    if(!this.tracePlayerRoot) {
+      this.tracePlayerRoot = createRoot(tracePlayerContainer);
+    }
+
+    this.tracePlayerRoot.render(
+      <TracePlayer
+        trace={this.trace}
+        state={this.tracePlayerState}
+        activeEvent={getActiveTraceEvent(this.tracePlayerState, this.trace)}
+        onPrevious={() => this.previousTraceStep()}
+        onNext={() => this.nextTraceStep()}
+        onReset={() => this.resetTracePlayer()}
+        onTogglePlay={() => this.toggleTracePlayback()}
+        onSpeedChange={(speed) => this.setTraceSpeed(speed)}
+      />
+    );
+  }
+
+  getTracePlayerContainer():HTMLElement | null {
+    const fvContainer = document.getElementById("fvContainer");
+    if(!fvContainer) return null;
+
+    let tracePlayerContainer = document.getElementById("trace-player-container");
+    if(!tracePlayerContainer) {
+      tracePlayerContainer = document.createElement("div");
+      tracePlayerContainer.id = "trace-player-container";
+      fvContainer.appendChild(tracePlayerContainer);
+    }
+
+    return tracePlayerContainer;
+  }
+
+  updateTracePlayerState(tracePlayerState:TracePlayerState) {
+    this.tracePlayerState = tracePlayerState;
+    this.applyTraceStep();
+    this.renderTracePlayer();
+    this.updateTracePlaybackTimer();
+  }
+
+  previousTraceStep() {
+    if(!this.tracePlayerState) return;
+    this.updateTracePlayerState(previousTraceStep({
+      ...this.tracePlayerState,
+      isPlaying: false
+    }));
+  }
+
+  nextTraceStep() {
+    if(!this.trace || !this.tracePlayerState) return;
+    this.updateTracePlayerState(nextTraceStep({
+      ...this.tracePlayerState,
+      isPlaying: false
+    }, this.trace));
+  }
+
+  resetTracePlayer() {
+    if(!this.tracePlayerState) return;
+    this.updateTracePlayerState(resetTracePlayer(this.tracePlayerState));
+  }
+
+  toggleTracePlayback() {
+    if(!this.trace || !this.tracePlayerState) return;
+
+    let nextState = toggleTracePlayback(this.tracePlayerState);
+    if(nextState.isPlaying && nextState.activeIndex === this.trace.events.length - 1) {
+      nextState = { ...nextState, activeIndex: 0 };
+    }
+
+    this.updateTracePlayerState(nextState);
+  }
+
+  setTraceSpeed(speed:number) {
+    if(!this.tracePlayerState) return;
+    this.updateTracePlayerState(setTraceSpeed(this.tracePlayerState, speed));
+  }
+
+  updateTracePlaybackTimer() {
+    if(this.tracePlaybackTimer !== null) {
+      window.clearTimeout(this.tracePlaybackTimer);
+      this.tracePlaybackTimer = null;
+    }
+
+    if(!this.trace || !this.tracePlayerState || !this.tracePlayerState.isPlaying) return;
+
+    const activeEvent = getActiveTraceEvent(this.tracePlayerState, this.trace);
+    const durationMs = Math.max(activeEvent.duration_ms / this.tracePlayerState.speed, 250);
+
+    this.tracePlaybackTimer = window.setTimeout(() => {
+      if(!this.trace || !this.tracePlayerState) return;
+
+      const isLastStep = this.tracePlayerState.activeIndex === this.trace.events.length - 1;
+      if(isLastStep) {
+        this.updateTracePlayerState({ ...this.tracePlayerState, isPlaying: false });
+        return;
+      }
+
+      this.updateTracePlayerState(nextTraceStep(this.tracePlayerState, this.trace));
+    }, durationMs);
+  }
+
+  applyTraceStep() {
+    if(!this.trace || !this.tracePlayerState) return;
+
+    const activeEvent = getActiveTraceEvent(this.tracePlayerState, this.trace);
+    if(this.paper && typeof this.paper.applyTraceUnits === "function") {
+      this.paper.applyTraceUnits(activeEvent.unit_ids);
+    }
+    this.updateTraceStreamHighlights(activeEvent.stream_ids);
+  }
+
+  updateTraceStreamHighlights(streamIds:string[]) {
+    this.activeTraceStreamIds.forEach((streamId) => {
+      if(!streamIds.includes(streamId)) this.dispatchTraceStreamEvent("RemoveHighlightStream", streamId);
+    });
+
+    streamIds.forEach((streamId) => {
+      if(!this.activeTraceStreamIds.includes(streamId)) this.dispatchTraceStreamEvent("HighlightStream", streamId);
+    });
+
+    this.activeTraceStreamIds = [...streamIds];
+  }
+
+  dispatchTraceStreamEvent(eventName:string, streamId:string) {
+    const idaesCanvas = document.querySelector('#fv');
+    const streamTable = document.querySelector('#stream-table-data');
+    const createTraceStreamEvent = () => new CustomEvent(
+      eventName,
+      {
+        detail: {
+          streamId
+        }
+      }
+    );
+
+    if(idaesCanvas) idaesCanvas.dispatchEvent(createTraceStreamEvent());
+    if(streamTable) streamTable.dispatchEvent(createTraceStreamEvent());
+  }
+
+  cleanTracePlayer() {
+    if(this.tracePlaybackTimer !== null) {
+      window.clearTimeout(this.tracePlaybackTimer);
+      this.tracePlaybackTimer = null;
+    }
+
+    this.updateTraceStreamHighlights([]);
+    if(this.paper && typeof this.paper.clearTraceUnits === "function") {
+      this.paper.clearTraceUnits();
+    }
+
+    if(this.tracePlayerRoot) {
+      this.tracePlayerRoot.unmount();
+      this.tracePlayerRoot = null;
+    }
+
+    const tracePlayerContainer = document.getElementById("trace-player-container");
+    if(tracePlayerContainer) tracePlayerContainer.remove();
+  }
+
     /**
      * Get the save time interval value from the application's setting block.
      */
@@ -272,11 +481,9 @@ export class FV {
       if (response.data.value != 'None') {
           save_time_interval = response.data.value;
       } else {
-          this.informUser(
-            1, 
-            `Warning: save_time_interval was not set correctly. Default time value of 
-            ${this._default_save_time_interval.toString()} 
-            will be set.`
+        this.informUser(
+            1,
+            `Warning: save_time_interval was not set correctly. Default time value of ${this._default_save_time_interval.toString()} will be set.`
           );
       }
     })
