@@ -1,4 +1,4 @@
-import type { RunTrace, TracePlayerState } from "./types";
+import type { RunTrace, RunTraceEvent, TracePlayerState } from "./types";
 
 export function createInitialTracePlayerState(trace: RunTrace): TracePlayerState {
   if (trace.events.length === 0) {
@@ -20,6 +20,17 @@ export function previousTraceStep(state: TracePlayerState): TracePlayerState {
 
 export function resetTracePlayer(state: TracePlayerState): TracePlayerState {
   return { ...state, activeIndex: 0, isPlaying: false };
+}
+
+export function getActiveTraceEvent(
+  state: TracePlayerState,
+  trace: RunTrace
+): RunTraceEvent {
+  return trace.events[state.activeIndex];
+}
+
+export function toggleTracePlayback(state: TracePlayerState): TracePlayerState {
+  return { ...state, isPlaying: !state.isPlaying };
 }
 
 export function setTraceSpeed(state: TracePlayerState, speed: number): TracePlayerState {

@@ -218,6 +218,14 @@ customized label style
   box-shadow: 2px 2px 15px rgb(142, 142, 142);
 }
 
+.trace-unit-active image {
+  filter: drop-shadow(0 0 8px #d97706);
+}
+
+.trace-unit-active text {
+  fill: #d97706;
+  font-weight: 700;
+}
 
 /*Header*/
 .header_each_btn:hover{

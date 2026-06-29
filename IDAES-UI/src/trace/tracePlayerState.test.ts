@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   createInitialTracePlayerState,
+  getActiveTraceEvent,
   nextTraceStep,
   previousTraceStep,
   resetTracePlayer,
   setTraceSpeed,
+  toggleTracePlayback,
 } from "./tracePlayerState";
 import type { RunTrace } from "./types";
 
@@ -58,6 +60,22 @@ describe("trace player state", () => {
 
     expect(resetTracePlayer(state).activeIndex).toBe(0);
     expect(resetTracePlayer(state).isPlaying).toBe(false);
+  });
+
+  it("returns the active trace event", () => {
+    const state = { ...createInitialTracePlayerState(trace), activeIndex: 1 };
+
+    expect(getActiveTraceEvent(state, trace).step_id).toBe("two");
+  });
+
+  it("toggles playback without moving the active step", () => {
+    const state = { ...createInitialTracePlayerState(trace), activeIndex: 1 };
+    const playing = toggleTracePlayback(state);
+    const paused = toggleTracePlayback(playing);
+
+    expect(playing.activeIndex).toBe(1);
+    expect(playing.isPlaying).toBe(true);
+    expect(paused.isPlaying).toBe(false);
   });
 
   it("accepts only positive playback speeds", () => {
