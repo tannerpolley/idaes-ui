@@ -481,11 +481,9 @@ export class FV {
       if (response.data.value != 'None') {
           save_time_interval = response.data.value;
       } else {
-          this.informUser(
-            1, 
-            `Warning: save_time_interval was not set correctly. Default time value of 
-            ${this._default_save_time_interval.toString()} 
-            will be set.`
+        this.informUser(
+            1,
+            `Warning: save_time_interval was not set correctly. Default time value of ${this._default_save_time_interval.toString()} will be set.`
           );
       }
     })
