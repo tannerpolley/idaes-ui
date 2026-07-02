@@ -50,11 +50,6 @@ The frontend UI development environment requires the Python backend server to be
 ### Build React
 The changes you make in the `IDAES-UI` folder are only for the development environment. To apply your changes to FV, you need to run the `npm run build` command.
 
-### Run trace playback
-The Python backend can register deterministic run-trace data through `visualize(..., trace=...)`. Registered traces are served at `/trace?id=<flowsheet_id>` and consumed by the frontend trace player. The trace event IDs must match the unit and stream IDs in the serialized flowsheet model so the player can highlight the active calculation step.
-
-After changing trace-player frontend code, run `npm run build` from `repo_root/IDAES-UI/` so `repo_root/idaes_ui/fv/static/` contains the bundled player used by the Python package.
-
 
 ## Learn more about IDAES UI:
 Currently there is one IDAES UI, the {{ vistitle }} ({{ visabbr }}).

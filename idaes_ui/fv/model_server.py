@@ -36,11 +36,6 @@ import traceback
 # package
 from idaes_ui.fv.flowsheet import FlowsheetDiff, FlowsheetSerializer
 from idaes_ui.fv.models import DiagnosticsData, DiagnosticsException, DiagnosticsError
-from idaes_ui.fv.run_trace import (
-    RunTraceValidationError,
-    TraceProvider,
-    normalize_run_trace,
-)
 from idaes.core.util.model_diagnostics import DiagnosticsToolbox
 from . import persist, errors
 
@@ -73,7 +68,6 @@ class FlowsheetServer(http.server.HTTPServer):
         super().__init__(("127.0.0.1", self._port), FlowsheetServerHandler)
         self._dsm = persist.DataStoreManager()
         self._flowsheets = {}
-        self._trace_providers = {}
         self._thr = None
         self._settings_block = {}
 
@@ -114,22 +108,6 @@ class FlowsheetServer(http.server.HTTPServer):
             _log.warning(f"key '{key}' is not set in the flowsheet settings block")
             return None
         return self._settings_block[key]  # {'save_time_interval': 5000}
-
-    def add_trace(self, id_: str, trace: TraceProvider):
-        """Register optional run trace data for a flowsheet."""
-        try:
-            self._trace_providers[id_] = normalize_run_trace(trace)
-        except RunTraceValidationError as err:
-            raise errors.ProcessingError(f"Invalid run trace: {err}") from err
-
-    def get_trace(self, id_: str) -> Dict:
-        """Return normalized run trace data for a flowsheet."""
-        try:
-            return self._trace_providers[id_]
-        except KeyError as err:
-            raise errors.ProcessingError(
-                f"No trace registered for flowsheet '{id_}'"
-            ) from err
 
     def add_flowsheet(self, id_, flowsheet, store: persist.DataStore) -> str:
         """Add a flowsheet, and also the method of saving it.
@@ -295,7 +273,6 @@ class FlowsheetServerHandler(http.server.SimpleHTTPRequestHandler):
         Routes:
           * `/app`: Return the web page
           * `/fs`: Retrieve an updated flowsheet.
-          * `/trace`: Retrieve optional run trace data.
           * `/setting`: Retrieve a setting value.
           * `/path/to/file`: Retrieve file stored static directory
         """
@@ -305,7 +282,7 @@ class FlowsheetServerHandler(http.server.SimpleHTTPRequestHandler):
         id_ = queries.get("id", None) if queries else None
 
         _log.debug(f"do_GET: path={self.path} id=={id_}")
-        if u.path in ("/app", "/fs", "/trace") and id_ is None:
+        if u.path in ("/app", "/fs") and id_ is None:
             self.send_error(
                 400, message=f"Query parameter 'id' is required for '{u.path}'"
             )
@@ -316,8 +293,6 @@ class FlowsheetServerHandler(http.server.SimpleHTTPRequestHandler):
             self._get_app(id_)
         elif u.path == "/fs":
             self._get_fs(id_)
-        elif u.path == "/trace":
-            self._get_trace(id_)
         elif u.path == "/setting":
             setting_key_ = queries.get("setting_key", None) if queries else None
             if setting_key_ is None:
@@ -363,15 +338,6 @@ class FlowsheetServerHandler(http.server.SimpleHTTPRequestHandler):
             return
         # Return merged flowsheet
         self._write_json(200, merged)
-
-    def _get_trace(self, id_: str):
-        """Get optional run trace data for a flowsheet."""
-        try:
-            trace = self.server.get_trace(id_)
-        except errors.ProcessingError as err:
-            self.send_error(404, message=str(err))
-            return
-        self._write_json(200, trace)
 
     def _get_setting(self, setting_key_: str):
         """Get setting value.

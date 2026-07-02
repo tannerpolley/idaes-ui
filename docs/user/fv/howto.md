@@ -41,47 +41,8 @@ visualize(
     browser: bool,
     port: Optional[int],
     quiet: bool,
-    loop_forever: bool,
-    trace: Optional[TraceProvider]
+    loop_forever: bool
 )
-```
-
-### Add run trace playback
-Pass `trace=` to show a replay panel that steps through the main solve sequence. Each event can highlight unit model IDs, stream IDs, and the values that changed at that point in the run.
-
-```python
-run_trace = {
-    "version": 1,
-    "events": [
-        {
-            "step_id": "load-feeds",
-            "label": "Load feeds",
-            "status": "running",
-            "unit_ids": ["OXIDE", "WATER"],
-            "stream_ids": ["s01", "s02"],
-            "duration_ms": 800,
-            "message": "Feed states are loaded into the flowsheet.",
-            "values": [
-                {"label": "OXIDE temperature", "value": 298.15, "units": "K"},
-                {"label": "WATER pressure", "value": 100000, "units": "Pa"},
-            ],
-        },
-        {
-            "step_id": "solve-reactor",
-            "label": "Solve reactor",
-            "status": "solved",
-            "unit_ids": ["R101"],
-            "stream_ids": ["s05"],
-            "duration_ms": 1200,
-            "message": "Reactor outlet conditions are available.",
-            "values": [
-                {"label": "Outlet temperature", "value": 450.0, "units": "K"},
-            ],
-        },
-    ],
-}
-
-flowsheet.visualize("Flowsheet Name", trace=run_trace, loop_forever=True)
 ```
 
 ---

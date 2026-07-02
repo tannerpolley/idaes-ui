@@ -28,8 +28,6 @@ export class Paper {
     _originalLinkStrokeWidth:Number;
     _highlightLinkStroke:String;
     _highlightLinkStrokeWidth:Number;
-    _traceUnitFill:string;
-    _activeTraceUnitIds:string[];
 
     _graph: any;
     _paper:any;
@@ -48,8 +46,6 @@ export class Paper {
         this._originalLinkStrokeWidth = 2;
         this._highlightLinkStroke = "#0B79BD";
         this._highlightLinkStrokeWidth = 4;
-        this._traceUnitFill = "#d97706";
-        this._activeTraceUnitIds = [];
 
         // jointjs objects
         this._graph = new joint.dia.Graph([], { cellNamespace: { standard } });
@@ -317,38 +313,6 @@ export class Paper {
                 });
             });
         });
-    }
-
-    applyTraceUnits(unitIds:string[]) {
-        this.clearTraceUnits();
-
-        this._activeTraceUnitIds = unitIds;
-        this._activeTraceUnitIds.forEach((unitId:string) => {
-            const unit = this._graph.getCell(unitId);
-            if(!unit) return;
-            const unitView = unit.findView(this._paper);
-            if(unitView) unitView.el.classList.add("trace-unit-active");
-
-            unit.attr({
-                label: {
-                    fill: this._traceUnitFill,
-                    fontWeight: 700
-                }
-            });
-        });
-    }
-
-    clearTraceUnits() {
-        this._activeTraceUnitIds.forEach((unitId:string) => {
-            const unit = this._graph.getCell(unitId);
-            if(!unit) return;
-            const unitView = unit.findView(this._paper);
-            if(unitView) unitView.el.classList.remove("trace-unit-active");
-
-            unit.removeAttr("label/fill");
-            unit.removeAttr("label/fontWeight");
-        });
-        this._activeTraceUnitIds = [];
     }
 
     /**

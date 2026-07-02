@@ -44,7 +44,7 @@ export function messageBarTemplateGenerator(whichCalled: string, succeed: boolea
 
     // initial template
     const messageBarTemplate = `
-        <div id='messageBarTextContainer'
+        <div id='messageBarTextContainer' 
             class="${css.messageBarTextContainer} ${!succeed ? css.bg_error : css.bg_successful}"
         >
             <i class="fa-solid fa-circle-check"></i>

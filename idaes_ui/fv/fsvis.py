@@ -27,7 +27,6 @@ from idaes import logger
 from .model_server import FlowsheetServer
 from . import persist, errors
 from .save_diagram_screenshot import SaveDiagramScreenshot
-from .run_trace import TraceProvider
 
 
 # Logging
@@ -69,7 +68,6 @@ def visualize(
     quiet: bool = False,
     loop_forever: bool = False,
     screenshot: bool = True,
-    trace: Optional[TraceProvider] = None,
 ) -> VisualizeResult:
     """Visualize the flowsheet in a web application.
 
@@ -100,7 +98,6 @@ def visualize(
         quiet: If True, suppress printing any messages to standard output (console)
         loop_forever: If True, don't return but instead loop until a Control-C is received. Useful when
            invoking this function at the end of a script.
-        trace: Optional deterministic run trace data for browser playback.
 
     Returns:
         See :data:`VisualizeResult`
@@ -180,11 +177,6 @@ def visualize(
         new_name = web_server.add_flowsheet(name, flowsheet, datastore)
     except (errors.ProcessingError, errors.DatastoreError) as err:
         raise errors.VisualizerError(f"Cannot add flowsheet: {err}")
-    if trace is not None:
-        try:
-            web_server.add_trace(new_name, trace)
-        except errors.ProcessingError as err:
-            raise errors.VisualizerError(f"Cannot add run trace: {err}") from err
 
     if new_name != name:
         _log.warning(f"Flowsheet name changed: old='{name}' new='{new_name}'")
